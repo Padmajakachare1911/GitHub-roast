@@ -83,23 +83,16 @@ function buildStats(user, repos) {
 }
 
 export function buildRoastPrompt(stats) {
-  return `You are a witty tech comedian roasting a GitHub profile. Be specific, punchy, and funny — never cruel or hateful. Reference actual details from the data. Write exactly 3-4 sentences. No hashtags, no emojis.
+  return `Write a VIRAL GitHub roast — 1-2 sentences MAX (under 30 words total). Think Twitter/X one-liner energy: punchy, meme-worthy, brutally specific, screenshot-worthy. Reference ONE real detail (repo name, stale commits, empty bio, follower ratio, language choice). Funny not cruel. No hashtags. No emojis. No filler.
 
-Profile data:
-- Username: ${stats.login}
-- Display name: ${stats.name ?? 'none'}
-- Bio: ${stats.bio ?? 'empty bio — say something about that'}
-- Followers: ${stats.followers}, Following: ${stats.following}
-- Public repos: ${stats.publicRepos}
-- Account created: ${stats.createdAt}
-- Top languages: ${stats.topLanguages.join(', ')}
-- Repo names: ${stats.repoNames.join(', ')}
-- Recent activity: ${stats.recentRepos.join('; ') || 'nothing recent'}
-- Stale repos (6+ months idle): ${stats.staleRepoCount}
-- Repos with descriptions: ${stats.reposWithDescription} of ${stats.totalReposFetched}
-- Forked repos: ${stats.forkCount}
+@${stats.login} | ${stats.publicRepos} repos | ${stats.followers} followers | bio: "${stats.bio ?? 'EMPTY'}"
+Languages: ${stats.topLanguages.slice(0, 3).join(', ')}
+Repos: ${stats.repoNames.slice(0, 6).join(', ')}
+${stats.staleRepoCount} repos untouched 6+ months | ${stats.forkCount} forks
 
-Roast this developer's GitHub presence:`;
+Example tone: "Your last commit was so long ago archaeologists are studying it." or "8 repos, 0 READMEs — bold strategy for a developer who hates documentation."
+
+Roast:`;
 }
 
 export function buildChatSystemPrompt(stats, roastText) {
@@ -144,8 +137,8 @@ export async function callGroq(messages, apiKey) {
     body: JSON.stringify({
       model,
       messages,
-      temperature: 0.9,
-      max_tokens: 400,
+      temperature: 1.0,
+      max_tokens: 120,
     }),
   });
 
@@ -163,7 +156,7 @@ export async function callGroq(messages, apiKey) {
 export async function generateRoast(stats, apiKey) {
   const result = await callGroq(
     [
-      { role: 'system', content: 'You write sharp, specific GitHub roasts. Funny, never hateful.' },
+      { role: 'system', content: 'You write viral one-liner GitHub roasts. Max 2 sentences. Savage but playful. Never hateful.' },
       { role: 'user', content: buildRoastPrompt(stats) },
     ],
     apiKey,
@@ -178,4 +171,36 @@ export async function generateChatReply(stats, roastText, history, userMessage, 
     { role: 'user', content: userMessage },
   ];
   return callGroq(messages, apiKey);
+}
+
+export function buildFullReport(stats, roast) {
+  const accountAge = stats.createdAt
+    ? Math.floor((Date.now() - new Date(stats.createdAt)) / (365.25 * 24 * 60 * 60 * 1000))
+    : '?';
+
+  return `GITHUB ROAST — FULL REPORT
+@${stats.login}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 YOUR ROAST
+${roast}
+
+📊 PROFILE AUTOPSY
+• Public repos: ${stats.publicRepos}
+• Followers / Following: ${stats.followers} / ${stats.following}
+• Account age: ~${accountAge} years
+• Top languages: ${stats.topLanguages.join(', ')}
+• Stale repos (6+ mo): ${stats.staleRepoCount}
+• Repos with descriptions: ${stats.reposWithDescription}/${stats.totalReposFetched}
+• Forks: ${stats.forkCount}
+
+📁 REPO HALL OF SHAME
+${stats.repoNames.map((r) => `• ${r}`).join('\n')}
+
+⚡ RECENT ACTIVITY
+${stats.recentRepos.length ? stats.recentRepos.map((r) => `• ${r}`).join('\n') : '• Nothing. Absolutely nothing.'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Roast a friend → https://github-roast.pages.dev
+`;
 }

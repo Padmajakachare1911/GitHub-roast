@@ -125,12 +125,51 @@ h1 {
   gap: 1.25rem;
 }
 
+.share-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .roast-card {
   background: linear-gradient(145deg, #161b22, #0d1117);
   border: 1px solid #30363d;
   border-radius: 16px;
   padding: 1.5rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.roast-card.social-card {
+  background: linear-gradient(160deg, #1a0f0f 0%, #161b22 40%, #0d1117 100%);
+  border: 2px solid #f85149;
+  border-radius: 20px;
+  padding: 1.75rem;
+  max-width: 520px;
+  margin: 0 auto;
+  aspect-ratio: 4 / 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.brand-mark {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #f85149;
+}
+
+.brand-url {
+  font-size: 0.65rem;
+  color: #8b949e;
+  font-family: ui-monospace, monospace;
 }
 
 .card-header {
@@ -161,26 +200,177 @@ h1 {
 
 .roast-text {
   margin: 0;
-  font-size: clamp(1.1rem, 4vw, 1.35rem);
-  line-height: 1.6;
-  font-weight: 500;
+  font-size: clamp(1.25rem, 5vw, 1.6rem);
+  line-height: 1.45;
+  font-weight: 700;
   color: #f0f6fc;
-  border-left: 3px solid #f85149;
-  padding-left: 1rem;
+  text-align: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
 }
 
-.card-actions {
-  margin-top: 1.25rem;
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #30363d;
+  font-size: 0.75rem;
+}
+
+.card-stat {
+  color: #8b949e;
+  font-family: ui-monospace, monospace;
+}
+
+.card-cta {
+  color: #f85149;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.share-hint {
+  text-align: center;
+  color: #8b949e;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.share-status {
+  text-align: center;
+  color: #3fb950;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.email-gate {
+  background: #161b22;
+  border: 1px dashed #30363d;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.email-gate.locked {
+  text-align: center;
+  border-color: #484f58;
+}
+
+.email-gate.signup {
+  border-style: solid;
+  border-color: #30363d;
+}
+
+.gate-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.report-preview {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.report-preview li {
+  padding: 0.5rem 0;
+  color: #8b949e;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #21262d;
+  filter: blur(3px);
+  user-select: none;
+}
+
+.report-preview li::before {
+  content: '🔒 ';
+}
+
+.unlock-cta {
+  background: linear-gradient(135deg, #f85149, #da3633);
+  border: none;
+  color: #fff;
+  padding: 0.85rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.back-link {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.back-link:hover {
+  color: #e6edf3;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #8b949e;
+  margin-bottom: 0.35rem;
+}
+
+.consent-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  color: #8b949e;
+  cursor: pointer;
+  text-align: left;
+}
+
+.consent-row input {
+  margin-top: 0.2rem;
+  accent-color: #f85149;
+}
+
+.submit-cta {
+  background: #238636;
+  border: none;
+  color: #fff;
+  padding: 0.85rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.submit-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .share-btn {
-  background: transparent;
+  background: #21262d;
   border: 1px solid #30363d;
   color: #e6edf3;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
+  padding: 0.65rem 0.5rem;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.8rem;
 }
 
 .share-btn:hover {
@@ -188,12 +378,20 @@ h1 {
   color: #f85149;
 }
 
-.email-gate {
-  background: #161b22;
-  border: 1px dashed #30363d;
-  border-radius: 12px;
-  padding: 1.25rem;
+.share-btn.primary {
+  background: #f85149;
+  border-color: #f85149;
+  color: #fff;
 }
+
+.share-btn.primary:hover {
+  background: #da3633;
+  color: #fff;
+}
+
+.share-btn.x:hover { border-color: #1d9bf0; color: #1d9bf0; }
+.share-btn.wa:hover { border-color: #25d366; color: #25d366; }
+.share-btn.li:hover { border-color: #0a66c2; color: #0a66c2; }
 
 .email-gate h3 {
   margin: 0 0 0.5rem;
@@ -376,7 +574,12 @@ h1 {
     flex-direction: column;
   }
 
-  .roast-form button {
-    padding: 0.85rem;
+  .share-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .roast-card.social-card {
+    aspect-ratio: auto;
+    min-height: 380px;
   }
 }

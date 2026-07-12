@@ -7,6 +7,12 @@ function apiDevPlugin() {
     name: 'github-roast-api',
     configureServer(server) {
       const env = loadEnv(server.config.mode, process.cwd(), '');
+      const getApiKey = () =>
+        env.GROQ_API_KEY ||
+        process.env.GROQ_API_KEY ||
+        env.OPENROUTER_API_KEY ||
+        process.env.OPENROUTER_API_KEY;
+      const getGithubToken = () => env.GITHUB_TOKEN || process.env.GITHUB_TOKEN;
 
       const json = (res, status, body) => {
         res.statusCode = status;
@@ -36,8 +42,8 @@ function apiDevPlugin() {
               return;
             }
 
-            const apiKey = env.GROQ_API_KEY || env.OPENROUTER_API_KEY;
-            const profile = await fetchGitHubProfile(clean, env.GITHUB_TOKEN);
+            const apiKey = getApiKey();
+            const profile = await fetchGitHubProfile(clean, getGithubToken());
             if (profile.error) {
               json(res, profile.error.includes('not found') ? 404 : 429, { error: profile.error });
               return;
@@ -72,7 +78,7 @@ function apiDevPlugin() {
         req.on('end', async () => {
           try {
             const { message, stats, roast, history = [] } = JSON.parse(body);
-            const apiKey = env.GROQ_API_KEY || env.OPENROUTER_API_KEY;
+            const apiKey = getApiKey();
             const reply = await generateChatReply(stats, roast, history, message, apiKey);
             if (reply.error) {
               json(res, 502, { error: reply.error });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import RoastCard from './components/RoastCard';
 import EmailGate from './components/EmailGate';
@@ -12,7 +12,7 @@ function RoastApp({ withConvex }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
-  const addSignup = useMutation(api.signups.add);
+  const signupAndSend = useAction(api.emails.signupAndSend);
   const logVisitMutation = useMutation(api.visits.log);
   const signupCount = useQuery(api.signups.count);
   const visitCount = useQuery(api.visits.count);
@@ -20,6 +20,12 @@ function RoastApp({ withConvex }) {
   useEffect(() => {
     logVisit(logVisitMutation);
   }, [logVisitMutation]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const u = params.get('u');
+    if (u && !result && !loading) setUsername(u);
+  }, [result, loading]);
 
   async function handleRoast(e) {
     e.preventDefault();
@@ -36,6 +42,10 @@ function RoastApp({ withConvex }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Roast failed');
       setResult(data);
+      const url = new URL(window.location.href);
+      url.searchParams.set('u', data.stats.login);
+      window.history.replaceState({}, '', url);
+      document.title = `@${data.stats.login} got roasted | GitHub Roast`;
     } catch (err) {
       setError(err.message);
     } finally {
@@ -45,7 +55,12 @@ function RoastApp({ withConvex }) {
 
   async function handleSignup(email) {
     if (!result) return;
-    await addSignup({ email, username: result.stats.login });
+    await signupAndSend({
+      email,
+      username: result.stats.login,
+      roast: result.roast,
+      stats: result.stats,
+    });
   }
 
   return (
@@ -76,17 +91,6 @@ function AppShell({
   visitCount,
   withConvex,
 }) {
-  async function handleShare() {
-    const url = window.location.href;
-    const text = `I just got roasted by GitHub Roast. Try yours: ${url}`;
-    if (navigator.share) {
-      await navigator.share({ title: 'GitHub Roast', text, url });
-    } else {
-      await navigator.clipboard.writeText(url);
-      alert('Link copied!');
-    }
-  }
-
   return (
     <div className="app">
       <header className="hero">
@@ -119,7 +123,7 @@ function AppShell({
 
       {result && (
         <section className="results">
-          <RoastCard stats={result.stats} roast={result.roast} onShare={handleShare} />
+          <RoastCard stats={result.stats} roast={result.roast} />
           <EmailGate username={result.stats.login} onSubmit={onSignup} withConvex={withConvex} />
         </section>
       )}

@@ -5,6 +5,8 @@ export default defineSchema({
   signups: defineTable({
     email: v.string(),
     username: v.string(),
+    roast: v.optional(v.string()),
+    emailSent: v.optional(v.boolean()),
     createdAt: v.number(),
   }).index('by_email', ['email']),
 
