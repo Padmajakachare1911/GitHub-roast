@@ -1,0 +1,6 @@
+name = "github-roast"
+compatibility_date = "2026-03-01"
+pages_build_output_dir = "dist"
+
+[vars]
+# Set secrets via: wrangler pages secret put GROQ_API_KEY
