@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import './index.css';
 import App from './App.jsx';
+import { initDataFast } from './lib/datafast.js';
+
+initDataFast();
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;

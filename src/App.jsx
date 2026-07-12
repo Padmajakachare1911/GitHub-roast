@@ -1,18 +1,32 @@
-import { useEffect, useState } from 'react';
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import RoastCard from './components/RoastCard';
 import EmailGate from './components/EmailGate';
 import ChatBot from './components/ChatBot';
 import { logVisit } from './lib/analytics';
+import { trackGoal } from './lib/datafast';
 
-function RoastApp({ withConvex }) {
+const hasConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
+
+function useAutoRoast(username, loading, result, onRoast) {
+  const autoRan = useRef(false);
+
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get('u');
+    if (!u || result || loading || autoRan.current) return;
+    autoRan.current = true;
+    onRoast({ preventDefault: () => {} }, u);
+  }, [username, loading, result, onRoast]);
+}
+
+function RoastApp() {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
-  const signupAndSend = useAction(api.emails.signupAndSend);
+  const addSignup = useMutation(api.signups.add);
   const logVisitMutation = useMutation(api.visits.log);
   const signupCount = useQuery(api.signups.count);
   const visitCount = useQuery(api.visits.count);
@@ -22,44 +36,53 @@ function RoastApp({ withConvex }) {
   }, [logVisitMutation]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const u = params.get('u');
-    if (u && !result && !loading) setUsername(u);
-  }, [result, loading]);
+    const u = new URLSearchParams(window.location.search).get('u');
+    if (u) setUsername(u);
+  }, []);
 
-  async function handleRoast(e) {
-    e.preventDefault();
-    setError('');
-    setResult(null);
-    setLoading(true);
+  const handleRoast = useCallback(
+    async (e, overrideUser) => {
+      e.preventDefault();
+      const target = (overrideUser || username).trim().replace(/^@/, '');
+      if (!target) return;
 
-    try {
-      const res = await fetch('/api/roast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Roast failed');
-      setResult(data);
-      const url = new URL(window.location.href);
-      url.searchParams.set('u', data.stats.login);
-      window.history.replaceState({}, '', url);
-      document.title = `@${data.stats.login} got roasted | GitHub Roast`;
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+      setError('');
+      setResult(null);
+      setLoading(true);
+      setUsername(target);
 
-  async function handleSignup(email) {
+      try {
+        const res = await fetch('/api/roast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: target }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Roast failed');
+        setResult(data);
+        trackGoal('roast', { username: data.stats.login });
+        const url = new URL(window.location.href);
+        url.searchParams.set('u', data.stats.login);
+        window.history.replaceState({}, '', url);
+        document.title = `@${data.stats.login} got roasted | GitHub Roast`;
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [username],
+  );
+
+  useAutoRoast(username, loading, result, handleRoast);
+
+  async function handleSignup(email, emailSent) {
     if (!result) return;
-    await signupAndSend({
+    await addSignup({
       email,
       username: result.stats.login,
       roast: result.roast,
-      stats: result.stats,
+      emailSent: emailSent ?? false,
     });
   }
 
@@ -74,7 +97,7 @@ function RoastApp({ withConvex }) {
       onSignup={handleSignup}
       signupCount={signupCount}
       visitCount={visitCount}
-      withConvex={withConvex}
+      showStats
     />
   );
 }
@@ -89,7 +112,7 @@ function AppShell({
   onSignup,
   signupCount,
   visitCount,
-  withConvex,
+  showStats,
 }) {
   return (
     <div className="app">
@@ -97,8 +120,8 @@ function AppShell({
         <p className="eyebrow">Hermes Buildathon · Virality Track</p>
         <h1>GitHub Roast</h1>
         <p className="subtitle">
-          Enter a GitHub username. Our AI reads your repos, commit habits, and README
-          energy — then delivers a shareable roast.
+          Type a GitHub username → get a viral one-liner roast → share the card → sign up for the full
+          autopsy.
         </p>
       </header>
 
@@ -124,11 +147,16 @@ function AppShell({
       {result && (
         <section className="results">
           <RoastCard stats={result.stats} roast={result.roast} />
-          <EmailGate username={result.stats.login} onSubmit={onSignup} withConvex={withConvex} />
+          <EmailGate
+            username={result.stats.login}
+            roast={result.roast}
+            stats={result.stats}
+            onSignup={onSignup}
+          />
         </section>
       )}
 
-      {withConvex && signupCount != null && visitCount != null && (
+      {showStats && signupCount != null && visitCount != null && (
         <footer className="stats-bar">
           <span>{visitCount} visitors</span>
           <span>{signupCount} signups</span>
@@ -146,27 +174,45 @@ function AppWithoutConvex() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
-  async function handleRoast(e) {
-    e.preventDefault();
-    setError('');
-    setResult(null);
-    setLoading(true);
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get('u');
+    if (u) setUsername(u);
+  }, []);
 
-    try {
-      const res = await fetch('/api/roast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Roast failed');
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const handleRoast = useCallback(
+    async (e, overrideUser) => {
+      e.preventDefault();
+      const target = (overrideUser || username).trim().replace(/^@/, '');
+      if (!target) return;
+
+      setError('');
+      setResult(null);
+      setLoading(true);
+      setUsername(target);
+
+      try {
+        const res = await fetch('/api/roast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: target }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Roast failed');
+        setResult(data);
+        trackGoal('roast', { username: data.stats.login });
+        const url = new URL(window.location.href);
+        url.searchParams.set('u', data.stats.login);
+        window.history.replaceState({}, '', url);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [username],
+  );
+
+  useAutoRoast(username, loading, result, handleRoast);
 
   return (
     <AppShell
@@ -179,12 +225,11 @@ function AppWithoutConvex() {
       onSignup={null}
       signupCount={null}
       visitCount={null}
-      withConvex={false}
+      showStats={false}
     />
   );
 }
 
 export default function App() {
-  const withConvex = Boolean(import.meta.env.VITE_CONVEX_URL);
-  return withConvex ? <RoastApp withConvex /> : <AppWithoutConvex />;
+  return hasConvex ? <RoastApp /> : <AppWithoutConvex />;
 }

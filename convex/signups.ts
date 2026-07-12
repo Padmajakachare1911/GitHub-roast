@@ -1,6 +1,33 @@
 import { mutation, internalMutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
+export const add = mutation({
+  args: {
+    email: v.string(),
+    username: v.string(),
+    roast: v.optional(v.string()),
+    emailSent: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const email = args.email.trim().toLowerCase();
+    const existing = await ctx.db
+      .query('signups')
+      .withIndex('by_email', (q) => q.eq('email', email))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert('signups', {
+        email,
+        username: args.username,
+        roast: args.roast,
+        emailSent: args.emailSent ?? false,
+        createdAt: Date.now(),
+      });
+    }
+    return { ok: true };
+  },
+});
+
 export const insert = internalMutation({
   args: {
     email: v.string(),
@@ -35,7 +62,6 @@ export const insert = internalMutation({
 export const count = query({
   args: {},
   handler: async (ctx) => {
-    const signups = await ctx.db.query('signups').collect();
-    return signups.length;
+    return (await ctx.db.query('signups').collect()).length;
   },
 });

@@ -8,15 +8,17 @@ export function getShareUrl(username) {
 }
 
 export function getShareText(username, roast) {
-  const snippet = roast.length > 120 ? `${roast.slice(0, 117)}…` : roast;
-  return `🔥 @${username} got ROASTED on GitHub:\n\n"${snippet}"\n\nGet yours → ${getShareUrl(username)}`;
+  const snippet = roast.length > 80 ? `${roast.slice(0, 77)}…` : roast;
+  return `I just got ROASTED on GitHub 🔥\n\n@${username}: "${snippet}"\n\nRoast yourself → ${getShareUrl(username)}`;
 }
 
 export async function exportCardAsPng(element) {
   if (!element) throw new Error('Card not found');
   return toPng(element, {
     cacheBust: true,
-    pixelRatio: 2,
+    pixelRatio: 1,
+    width: 1080,
+    height: 1350,
     backgroundColor: '#0d1117',
   });
 }
@@ -59,18 +61,35 @@ export async function shareCardNative(element, username, roast) {
   return 'copied';
 }
 
-export function openTwitterShare(username, roast) {
-  const text = getShareText(username, roast);
-  const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank', 'noopener,noreferrer,width=550,height=420');
+export function copyShareCaption(username, roast) {
+  return navigator.clipboard.writeText(getShareText(username, roast));
 }
 
-export function openLinkedInShare(username) {
-  const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl(username))}`;
-  window.open(url, '_blank', 'noopener,noreferrer,width=550,height=620');
+export function openTwitterShare(username, roast) {
+  const text = getShareText(username, roast);
+  window.open(
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
+    '_blank',
+    'noopener,noreferrer,width=550,height=420',
+  );
+}
+
+export function openLinkedInShare(username, roast) {
+  const text = getShareText(username, roast).slice(0, 300);
+  window.open(
+    `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl(username))}&summary=${encodeURIComponent(text)}`,
+    '_blank',
+    'noopener,noreferrer,width=550,height=620',
+  );
 }
 
 export function openWhatsAppShare(username, roast) {
-  const text = getShareText(username, roast);
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  window.open(`https://wa.me/?text=${encodeURIComponent(getShareText(username, roast))}`, '_blank');
+}
+
+export function openInstagramHint(username) {
+  alert(
+    'Instagram:\n1. PNG just downloaded\n2. Open Instagram → Story or Post\n3. Upload the card image\n4. Add link sticker → ' +
+      getShareUrl(username),
+  );
 }

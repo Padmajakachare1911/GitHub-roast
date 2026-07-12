@@ -39,6 +39,8 @@ Open http://localhost:5173 — enter a GitHub username, get roasted.
 |----------|-------|----------|
 | `GROQ_API_KEY` | `.env` + Cloudflare secret | Yes (or OpenRouter) |
 | `VITE_CONVEX_URL` | `.env.local` (auto from convex dev) | For signups/analytics |
+| `VITE_DATAFAST_WEBSITE_ID` | `.env` + Cloudflare build env | DataFast tracking (`dfid_…`) |
+| `VITE_DATAFAST_DOMAIN` | `.env` + Cloudflare build env | Your live domain (e.g. `github-roast-6b8.pages.dev`) |
 | `GITHUB_TOKEN` | `.env` + Cloudflare secret | Optional (rate limits) |
 
 ## Deploy to Cloudflare Pages
@@ -50,7 +52,16 @@ npx wrangler pages secret put GROQ_API_KEY
 npx wrangler pages secret put GITHUB_TOKEN   # optional
 ```
 
-Set `VITE_CONVEX_URL` in Cloudflare Pages → Settings → Environment variables (build-time).
+Set `VITE_CONVEX_URL`, `VITE_DATAFAST_WEBSITE_ID`, and `VITE_DATAFAST_DOMAIN` in Cloudflare Pages → Settings → Environment variables (build-time).
+
+## DataFast analytics
+
+1. Create a website at [datafa.st](https://datafa.st) → copy **Website ID** (`dfid_…`) from Settings → General.
+2. Set `data-domain` to your live URL (currently `github-roast-6b8.pages.dev`).
+3. Add build env vars in Cloudflare Pages (or `.env.production` locally), then redeploy.
+4. Optional: set `signup` as your #1 KPI in DataFast website settings.
+
+Tracked goals: `roast` (username), `signup` (email sent flag).
 
 ## Architecture
 
