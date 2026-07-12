@@ -89,20 +89,15 @@ function apiDevPlugin() {
               return;
             }
 
-            const apiKey = getApiKey();
-            const profile = await fetchGitHubProfile(clean, getGithubToken());
-            if (profile.error) {
-              json(res, profile.error.includes('not found') ? 404 : 429, { error: profile.error });
+            const apiKey = env.GROQ_API_KEY || env.OPENROUTER_API_KEY;
+            const roastResult = await generateRoast(clean, apiKey, env.GITHUB_TOKEN);
+            
+            if (roastResult.error) {
+              json(res, 502, { error: roastResult.error });
               return;
             }
 
-            const roast = await generateRoast(profile.stats, apiKey);
-            if (roast.error) {
-              json(res, 502, { error: roast.error });
-              return;
-            }
-
-            json(res, 200, { roast: roast.text, stats: profile.stats });
+            json(res, 200, { roast: roastResult.text, stats: roastResult.stats });
           } catch (err) {
             json(res, 500, { error: err.message });
           }

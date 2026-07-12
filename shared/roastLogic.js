@@ -97,7 +97,7 @@ Stats: ${stats.publicRepos} repos, ${stats.followers} followers, languages: ${st
 Answer follow-up questions about their profile or the roast. Keep replies under 3 sentences. Stay playful, not mean.`;
 }
 
-export async function callGroq(messages, apiKey) {
+export async function callGroq(messages, apiKey, tools, tool_choice) {
   if (!apiKey) {
     return {
       error:
@@ -123,57 +123,129 @@ export async function callGroq(messages, apiKey) {
     headers['X-Title'] = 'GitHub Roast';
   }
 
+  const body = {
+    model,
+    messages,
+    temperature: 1.25,
+    max_tokens: 60,
+  };
+
+  if (tools) body.tools = tools;
+  if (tool_choice) body.tool_choice = tool_choice;
+
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 1.25,
-      max_tokens: 60,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    return { error: `LLM request failed (${res.status}): ${body.slice(0, 200)}` };
+    const bodyStr = await res.text();
+    return { error: `LLM request failed (${res.status}): ${bodyStr.slice(0, 200)}` };
   }
 
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) return { error: 'LLM returned an empty response. Try again.' };
-  return { text };
+  const message = data.choices?.[0]?.message;
+  if (!message) return { error: 'LLM returned an empty response. Try again.' };
+  
+  return { 
+    text: message.content?.trim(), 
+    toolCalls: message.tool_calls,
+    message 
+  };
 }
 
-export async function generateRoast(stats, apiKey) {
+export async function generateRoast(username, apiKey, githubToken) {
   const system =
-    'You write viral one-liner GitHub roasts under 15 words. Savage, specific, funny, meme-worthy. Never hateful or discriminatory.';
-  const prompt = buildRoastPrompt(stats);
+    'You write viral one-liner GitHub roasts under 15 words. Savage, specific, funny, meme-worthy. Never hateful or discriminatory. You must use the fetch_github_profile tool to get the user data before roasting them. If the tool returns an error or says user not found, roast them for making up a fake username or having no profile.';
+  
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "fetch_github_profile",
+        description: "Fetches a GitHub user's profile statistics and repository data to be used for the roast.",
+        parameters: {
+          type: "object",
+          properties: {
+            username: {
+              type: "string",
+              description: "The GitHub username to fetch data for."
+            }
+          },
+          required: ["username"]
+        }
+      }
+    }
+  ];
 
-  let result = await callGroq(
-    [
-      { role: 'system', content: system },
-      { role: 'user', content: prompt },
-    ],
-    apiKey,
-  );
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user', content: `Please roast the GitHub profile for: ${username}` }
+  ];
+
+  let result = await callGroq(messages, apiKey, tools, "auto");
   if (result.error) return result;
 
-  let text = polishRoast(result.text);
-  if (!roastMentionsDetail(text, stats)) {
+  let finalStats = null;
+  let text = result.text || "";
+
+  if (result.toolCalls && result.toolCalls.length > 0) {
+    const toolCall = result.toolCalls[0];
+    if (toolCall.function.name === 'fetch_github_profile') {
+      const args = JSON.parse(toolCall.function.arguments);
+      const profile = await fetchGitHubProfile(args.username || username, githubToken);
+      
+      messages.push(result.message);
+
+      let prompt = "";
+      if (profile.error) {
+        prompt = `The user tried to fetch a GitHub profile for username "${args.username || username}", but it failed with error: "${profile.error}". Roast them for providing a fake or invalid GitHub username.`;
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: JSON.stringify({ error: profile.error, username: args.username || username })
+        });
+      } else {
+        finalStats = profile.stats;
+        prompt = buildRoastPrompt(profile.stats);
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: prompt
+        });
+      }
+
+      // We explicitly guide the model to roast based on the tool result
+      messages.push({ role: 'user', content: prompt });
+
+      const finalResult = await callGroq(messages, apiKey);
+      if (finalResult.error) return finalResult;
+      text = finalResult.text;
+    }
+  }
+
+  if (!text) {
+     return { text: "You tricked me. No roast for you.", stats: null };
+  }
+
+  text = polishRoast(text);
+  if (finalStats && !roastMentionsDetail(text, finalStats)) {
     const retry = await callGroq(
       [
         { role: 'system', content: system },
         {
           role: 'user',
-          content: `${prompt}\n\nYour last roast was too generic. MUST name "${stats.repoNames[0]}" or cite ${stats.staleRepoCount} stale repos or ${stats.followers} followers.`,
+          content: `${buildRoastPrompt(finalStats)}\n\nYour last roast was too generic. MUST name "${finalStats.repoNames[0]}" or cite ${finalStats.staleRepoCount} stale repos or ${finalStats.followers} followers.`,
         },
       ],
       apiKey,
     );
     if (!retry.error) text = polishRoast(retry.text);
   }
-  return { text };
+  return { text, stats: finalStats };
 }
 
 export async function generateChatReply(stats, roastText, history, userMessage, apiKey) {

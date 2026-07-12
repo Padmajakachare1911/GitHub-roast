@@ -21,21 +21,14 @@ export async function onRequestPost(context) {
     const apiKey = context.env.GROQ_API_KEY || context.env.OPENROUTER_API_KEY;
     const githubToken = context.env.GITHUB_TOKEN;
 
-    const profile = await fetchGitHubProfile(username, githubToken);
-    if (profile.error) {
-      return new Response(JSON.stringify({ error: profile.error }), {
-        status: profile.error.includes('not found') ? 404 : 429,
-        headers: cors,
-      });
-    }
-
-    const roast = await generateRoast(profile.stats, apiKey);
-    if (roast.error) {
-      return new Response(JSON.stringify({ error: roast.error }), { status: 502, headers: cors });
+    const roastResult = await generateRoast(username, apiKey, githubToken);
+    
+    if (roastResult.error) {
+      return new Response(JSON.stringify({ error: roastResult.error }), { status: 502, headers: cors });
     }
 
     return new Response(
-      JSON.stringify({ roast: roast.text, stats: profile.stats }),
+      JSON.stringify({ roast: roastResult.text, stats: roastResult.stats }),
       { status: 200, headers: cors },
     );
   } catch (err) {
