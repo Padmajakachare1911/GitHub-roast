@@ -2,6 +2,8 @@
 
 AI roasts your GitHub profile. Share the card, capture emails via Convex, chat with a free-API bot — no Hermes Telegram required.
 
+Try GitHub Roast: https://github-roast-6b8.pages.dev/
+
 ## Quick start
 
 ```bash
