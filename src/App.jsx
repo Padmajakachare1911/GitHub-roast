@@ -20,11 +20,94 @@ function useAutoRoast(username, loading, result, onRoast) {
   }, [username, loading, result, onRoast]);
 }
 
+function useMidnightReset() {
+  const [startOfToday, setStartOfToday] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  });
+
+  useEffect(() => {
+    let timeoutId;
+    function scheduleNextReset() {
+      const now = Date.now();
+      const nextMidnight = new Date();
+      nextMidnight.setHours(24, 0, 0, 0);
+      const msUntilMidnight = nextMidnight.getTime() - now;
+
+      // Add a 100ms buffer to ensure we are safely into the next day
+      timeoutId = setTimeout(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        setStartOfToday(d.getTime());
+        scheduleNextReset();
+      }, msUntilMidnight + 100);
+    }
+
+    scheduleNextReset();
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  return startOfToday;
+}
+
+function useLocalRoastCount(startOfToday) {
+  const [count, setCount] = useState(() => {
+    try {
+      const stored = localStorage.getItem('local_roast_count');
+      if (stored) {
+        const { timestamp, value } = JSON.parse(stored);
+        if (timestamp === startOfToday) {
+          return value;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('local_roast_count');
+      if (stored) {
+        const { timestamp } = JSON.parse(stored);
+        if (timestamp !== startOfToday) {
+          setCount(0);
+          localStorage.setItem('local_roast_count', JSON.stringify({ timestamp: startOfToday, value: 0 }));
+        }
+      } else {
+        localStorage.setItem('local_roast_count', JSON.stringify({ timestamp: startOfToday, value: count }));
+      }
+    } catch {
+      // Ignore
+    }
+  }, [startOfToday, count]);
+
+  const increment = useCallback(() => {
+    setCount((prev) => {
+      const newVal = prev + 1;
+      try {
+        localStorage.setItem('local_roast_count', JSON.stringify({ timestamp: startOfToday, value: newVal }));
+      } catch {
+        // Ignore
+      }
+      return newVal;
+    });
+  }, [startOfToday]);
+
+  return [count, increment];
+}
+
 function RoastApp() {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+
+  const startOfToday = useMidnightReset();
+  const recordRoast = useMutation(api.roasts.record);
+  const todayRoastCount = useQuery(api.roasts.getTodayCount, { startOfToday });
 
   const addSignup = useMutation(api.signups.add);
   const logVisitMutation = useMutation(api.visits.log);
@@ -61,6 +144,10 @@ function RoastApp() {
         if (!res.ok) throw new Error(data.error || 'Roast failed');
         setResult(data);
         trackGoal('roast', { username: data.stats.login });
+
+        // Record the roast in Convex
+        await recordRoast({ username: data.stats.login });
+
         const url = new URL(window.location.href);
         url.searchParams.set('u', data.stats.login);
         window.history.replaceState({}, '', url);
@@ -71,7 +158,7 @@ function RoastApp() {
         setLoading(false);
       }
     },
-    [username],
+    [username, recordRoast],
   );
 
   useAutoRoast(username, loading, result, handleRoast);
@@ -98,6 +185,7 @@ function RoastApp() {
       signupCount={signupCount}
       visitCount={visitCount}
       showStats
+      todayRoastCount={todayRoastCount}
     />
   );
 }
@@ -113,6 +201,7 @@ function AppShell({
   signupCount,
   visitCount,
   showStats,
+  todayRoastCount,
 }) {
   return (
     <div className="app">
@@ -126,6 +215,14 @@ function AppShell({
       </header>
 
       <form className="roast-form" onSubmit={onRoast}>
+        {todayRoastCount !== undefined && todayRoastCount !== null && (
+          <div className="daily-counter">
+            <span className="counter-icon">🔥</span>
+            <span className="counter-text">
+              <span className="counter-number">{todayRoastCount}</span> {todayRoastCount === 1 ? 'developer' : 'developers'} roasted today
+            </span>
+          </div>
+        )}
         <div className="input-row">
           <span className="prefix">github.com/</span>
           <input
@@ -174,6 +271,9 @@ function AppWithoutConvex() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
+  const startOfToday = useMidnightReset();
+  const [localRoastCount, incrementLocalRoastCount] = useLocalRoastCount(startOfToday);
+
   useEffect(() => {
     const u = new URLSearchParams(window.location.search).get('u');
     if (u) setUsername(u);
@@ -200,6 +300,10 @@ function AppWithoutConvex() {
         if (!res.ok) throw new Error(data.error || 'Roast failed');
         setResult(data);
         trackGoal('roast', { username: data.stats.login });
+
+        // Increment local count
+        incrementLocalRoastCount();
+
         const url = new URL(window.location.href);
         url.searchParams.set('u', data.stats.login);
         window.history.replaceState({}, '', url);
@@ -209,7 +313,7 @@ function AppWithoutConvex() {
         setLoading(false);
       }
     },
-    [username],
+    [username, incrementLocalRoastCount],
   );
 
   useAutoRoast(username, loading, result, handleRoast);
@@ -226,6 +330,7 @@ function AppWithoutConvex() {
       signupCount={null}
       visitCount={null}
       showStats={false}
+      todayRoastCount={localRoastCount}
     />
   );
 }

@@ -18,4 +18,9 @@ export default defineSchema({
   })
     .index('by_session', ['sessionId'])
     .index('by_created', ['createdAt']),
+
+  roasts: defineTable({
+    username: v.string(),
+    createdAt: v.number(),
+  }).index('by_created', ['createdAt']),
 });
